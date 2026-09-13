@@ -1,14 +1,11 @@
 # Statistical tests and correction methods used by the DataDrift Monitor.
 
-
 import numpy as np
-
-from scipy.stats import chi2_contingency
-from scipy.stats import ks_2samp
-
 
 # Calculate the two-sample Kolmogorov-Smirnov test for numerical data.
 def calculate_ks_test(reference_data, current_data):
+    from scipy.stats import ks_2samp
+
     """Calculate the two-sample Kolmogorov-Smirnov test."""
 
     reference_data = np.asarray(reference_data)
@@ -42,7 +39,7 @@ def calculate_ks_test(reference_data, current_data):
 
 # Calculate the chi-square test using category frequency counts.
 def calculate_chi_square_test(reference_data, current_data):
-    """Calculate the chi-square test for categorical data."""
+    from scipy.stats import chi2_contingency
 
     reference_counts = reference_data.value_counts()
     current_counts = current_data.value_counts()
@@ -93,6 +90,7 @@ def calculate_chi_square_test(reference_data, current_data):
 # Calculate Cramér's V as the effect-size measure for categorical drift.
 def calculate_cramers_v(reference_data, current_data):
     """Calculate Cramér's V for categorical data."""
+    from scipy.stats import chi2_contingency
 
     reference_counts = reference_data.value_counts()
     current_counts = current_data.value_counts()
@@ -208,6 +206,7 @@ def has_sparse_expected_counts(
     threshold=5,
 ):
     """Check whether a categorical comparison has sparse expected frequencies."""
+    from scipy.stats import chi2_contingency
 
     reference_counts = reference_data.value_counts()
     current_counts = current_data.value_counts()

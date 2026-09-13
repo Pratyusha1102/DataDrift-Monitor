@@ -1,5 +1,7 @@
 # Build the user interface for the DataDrift Monitor dashboard.
 
+from io import BytesIO
+
 import streamlit as st
 
 from src.data_loader import load_csv
@@ -23,6 +25,25 @@ from src.visualization import (
     plot_categorical_distribution,
 )
 
+# Load uploaded CSV bytes into a DataFrame and cache the result.
+@st.cache_data(show_spinner=False)
+def load_uploaded_csv(file_bytes):
+    return load_csv(BytesIO(file_bytes))
+
+# Run statistical drift analysis and cache the results for unchanged inputs.
+@st.cache_data(show_spinner=False)
+def run_drift_analysis(
+    reference_df,
+    current_df,
+    common_columns,
+    alpha,
+):
+    return detect_drift(
+        reference_df,
+        current_df,
+        common_columns,
+        alpha=alpha,
+    )
 
 # Configure the Streamlit page.
 st.set_page_config(
@@ -210,8 +231,8 @@ if analyze_button:
             with st.spinner("Loading and analyzing datasets..."):
 
                 # Load both CSV files.
-                reference_df = load_csv(reference_file)
-                current_df = load_csv(current_file)
+                reference_df = load_uploaded_csv(reference_file.getvalue())
+                current_df = load_uploaded_csv(current_file.getvalue())
 
                 # Validate that both datasets contain data.
                 validate_not_empty(reference_df)
@@ -240,13 +261,14 @@ if analyze_button:
                     common_columns,
                 )
 
-                # Detect statistical drift.
-                results_df = detect_drift(
-                    reference_df,
-                    current_df,
-                    common_columns,
-                    alpha=alpha,
-                )
+                # Run the cached statistical drift analysis while showing processing feedback.
+                with st.spinner("Analyzing datasets for statistical drift..."):
+                    results_df = run_drift_analysis(
+                        reference_df,
+                        current_df,
+                        common_columns,
+                        alpha,
+                    )
 
             # Store the analysis results in Streamlit session state.
             st.session_state["reference_df"] = reference_df
@@ -787,7 +809,6 @@ if "results_df" in st.session_state:
                 current_df[selected_feature],
                 selected_feature,
             )
-
 
         st.pyplot(
             distribution_chart,

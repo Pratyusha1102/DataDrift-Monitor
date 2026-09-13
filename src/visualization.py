@@ -1,6 +1,5 @@
 # Create presentation-friendly charts for the DataDrift Monitor dashboard.
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 
@@ -36,6 +35,8 @@ def apply_chart_style(ax):
 
 # Compare numerical feature distributions using overlaid histograms.
 def plot_numerical_distribution(reference_series, current_series, feature_name):
+    import matplotlib.pyplot as plt
+
     # Remove missing numerical values before plotting.
     reference_data = reference_series.dropna()
     current_data = current_series.dropna()
@@ -121,6 +122,8 @@ def plot_numerical_distribution(reference_series, current_series, feature_name):
 
 # Compare categorical feature proportions using grouped bars.
 def plot_categorical_distribution(reference_series, current_series, feature_name):
+    import matplotlib.pyplot as plt
+
     reference_data = reference_series.astype("object").fillna("[MISSING]")
 
     current_data = current_series.astype("object").fillna("[MISSING]")
@@ -205,6 +208,8 @@ def plot_categorical_distribution(reference_series, current_series, feature_name
 
 # Create a compact horizontal bar chart for overall drift status.
 def plot_drift_summary(results_df):
+    import matplotlib.pyplot as plt
+
     status_counts = (
         results_df["status"]
         .value_counts()
@@ -219,19 +224,23 @@ def plot_drift_summary(results_df):
         )
     )
 
-    # Create a compact horizontal chart.
-    fig, ax = plt.subplots(
-        figsize=(10, 3),
-    )
-
+    fig, ax = plt.subplots(figsize=(10, 3))
     fig.patch.set_alpha(0)
 
-    status_counts.plot(
-        kind="barh",
-        ax=ax,
-        width=0.65,
+    # Draw the bars directly with Matplotlib instead of pandas plotting.
+    values = status_counts.to_numpy()
+    labels = status_counts.index.to_list()
+    positions = range(len(labels))
+
+    ax.barh(
+        positions,
+        values,
+        height=0.65,
         alpha=0.85,
     )
+
+    ax.set_yticks(list(positions))
+    ax.set_yticklabels(labels)
 
     ax.set_title(
         "Drift Detection Summary",
@@ -244,10 +253,7 @@ def plot_drift_summary(results_df):
         fontsize=10,
     )
 
-    ax.set_ylabel(
-        "",
-        fontsize=10,
-    )
+    ax.set_ylabel("")
 
     # Keep status labels horizontal and readable.
     ax.tick_params(
