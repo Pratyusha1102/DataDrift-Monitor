@@ -1,5 +1,6 @@
 # Test the statistical drift detection functions.
 
+
 import pandas as pd
 
 from src.statistics import (
@@ -13,8 +14,8 @@ from src.drift_detector import (
     is_numeric_feature,
     analyze_feature,
     detect_drift,
+    classify_drift_severity,
 )
-
 
 # Verify that numerical data is correctly identified.
 def test_is_numeric_feature():
@@ -109,3 +110,118 @@ def test_detect_drift_flags_sparse_categories():
     results = detect_drift(reference_df, current_df, ["education"])
 
     assert results.loc[0, "status"] == "Needs review"
+
+# Verify that a large numerical KS statistic is classified as high severity.
+def test_classify_numerical_high_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="numerical",
+        statistic=0.60,
+        effect_size=None,
+    ) == "High"
+
+
+# Verify that a moderate numerical KS statistic is classified as medium severity.
+def test_classify_numerical_medium_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="numerical",
+        statistic=0.30,
+        effect_size=None,
+    ) == "Medium"
+
+
+# Verify that a small numerical KS statistic is classified as low severity.
+def test_classify_numerical_low_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="numerical",
+        statistic=0.10,
+        effect_size=None,
+    ) == "Low"
+
+
+# Verify that a large categorical Cramér's V is classified as high severity.
+def test_classify_categorical_high_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="categorical",
+        statistic=18.0,
+        effect_size=0.60,
+    ) == "High"
+
+
+# Verify that a moderate categorical Cramér's V is classified as medium severity.
+def test_classify_categorical_medium_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="categorical",
+        statistic=12.0,
+        effect_size=0.35,
+    ) == "Medium"
+
+
+# Verify that a small categorical Cramér's V is classified as low severity.
+def test_classify_categorical_low_severity():
+    assert classify_drift_severity(
+        status="Significant drift",
+        feature_type="categorical",
+        statistic=5.0,
+        effect_size=0.10,
+    ) == "Low"
+
+
+# Verify that potential drift receives a review classification.
+def test_classify_potential_drift_for_review():
+    assert classify_drift_severity(
+        status="Potential drift",
+        feature_type="numerical",
+        statistic=0.40,
+        effect_size=None,
+    ) == "Review"
+
+
+# Verify that stable features receive no drift severity.
+def test_classify_stable_feature():
+    assert classify_drift_severity(
+        status="Stable",
+        feature_type="numerical",
+        statistic=0.01,
+        effect_size=None,
+    ) == "None"
+
+
+# Verify that data-quality problems are explicitly marked for review.
+def test_classify_needs_review():
+    assert classify_drift_severity(
+        status="Needs review",
+        feature_type="categorical",
+        statistic=None,
+        effect_size=None,
+    ) == "Needs review"
+
+# Verify that detect_drift includes severity classifications in its results.
+def test_detect_drift_includes_severity():
+    reference = pd.DataFrame(
+        {
+            "age": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
+        }
+    )
+
+    current = pd.DataFrame(
+        {
+            "age": [50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
+        }
+    )
+
+    results = detect_drift(reference, current, ["age"])
+
+    assert "severity" in results.columns
+    assert results.loc[0, "severity"] in {
+        "High",
+        "Medium",
+        "Low",
+        "Review",
+        "None",
+        "Needs review",
+    }

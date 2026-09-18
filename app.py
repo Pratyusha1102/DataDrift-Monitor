@@ -19,6 +19,13 @@ from src.drift_detector import (
     get_feature_interpretation,
 )
 
+from src.insights import (
+    add_phase_two_insights,
+    analyze_drift_relationships,
+    build_html_report,
+    categorical_change_details,
+)
+
 from src.visualization import (
     plot_drift_summary,
     plot_numerical_distribution,
@@ -270,12 +277,27 @@ if analyze_button:
                         alpha,
                     )
 
+                    # Add descriptive findings without changing test results.
+                    results_df = add_phase_two_insights(
+                        results_df,
+                        reference_df,
+                        current_df,
+                    )
+
+                    # Calculate numerical association changes separately.
+                    relationships_df = analyze_drift_relationships(
+                        reference_df,
+                        current_df,
+                        common_columns,
+                    )
+
             # Store the analysis results in Streamlit session state.
             st.session_state["reference_df"] = reference_df
             st.session_state["current_df"] = current_df
             st.session_state["results_df"] = results_df
             st.session_state["common_columns"] = common_columns
             st.session_state["alpha"] = alpha
+            st.session_state["relationships_df"] = relationships_df
 
             st.success(
                 "Drift analysis completed successfully."
@@ -298,6 +320,7 @@ if "results_df" in st.session_state:
     results_df = st.session_state["results_df"]
     common_columns = st.session_state["common_columns"]
     alpha = st.session_state["alpha"]
+    relationships_df = st.session_state["relationships_df"]
 
     st.divider()
 
@@ -461,6 +484,45 @@ if "results_df" in st.session_state:
 
 
     # ---------------------------------------------------------
+    # DRIFT SEVERITY AND INVESTIGATION
+    # ---------------------------------------------------------
+
+    st.subheader("Drift Severity and Investigation")
+
+    st.markdown(
+        """
+        <div class="section-description">
+            Severity describes the magnitude of the statistical distribution
+            difference. It is not a business-impact or model-risk score.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.dataframe(
+        results_df[
+            [
+                "feature",
+                "feature_type",
+                "status",
+                "severity",
+                "what_changed",
+            ]
+        ].rename(
+            columns={
+                "feature": "Feature",
+                "feature_type": "Type",
+                "status": "Status",
+                "severity": "Severity",
+                "what_changed": "What Changed",
+            }
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+
+
+    # ---------------------------------------------------------
     # FEATURE RESULTS TABLE
     # ---------------------------------------------------------
 
@@ -491,6 +553,8 @@ if "results_df" in st.session_state:
             "current_missing_pct": "Current Missing %",
             "needs_review": "Review",
             "status": "Status",
+            "severity": "Severity",
+            "what_changed": "What Changed",
         }
     )
 
@@ -556,13 +620,64 @@ if "results_df" in st.session_state:
     # DOWNLOAD RESULTS
     # ---------------------------------------------------------
 
-    st.download_button(
-        label="Download Full Results CSV",
-        data=results_df.to_csv(index=False).encode("utf-8"),
-        file_name="data_drift_results.csv",
-        mime="text/csv",
-        use_container_width=False,
-    )
+    download_col1, download_col2 = st.columns(2)
+
+    with download_col1:
+
+        st.download_button(
+            label="Download Full Results CSV",
+            data=results_df.to_csv(index=False).encode("utf-8"),
+            file_name="data_drift_results.csv",
+            mime="text/csv",
+            use_container_width=False,
+        )
+
+    with download_col2:
+
+        st.download_button(
+            label="Download HTML Report",
+            data=build_html_report(
+                results_df,
+                relationships_df,
+                alpha,
+            ),
+            file_name="data_drift_report.html",
+            mime="text/html",
+            use_container_width=False,
+        )
+
+
+    # ---------------------------------------------------------
+    # DRIFT RELATIONSHIPS
+    # ---------------------------------------------------------
+
+    if not relationships_df.empty:
+
+        st.subheader("Drift Relationships")
+
+        st.markdown(
+            """
+            <div class="section-description">
+                Pearson-correlation changes among numerical features.
+                These describe association, not causation.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.dataframe(
+            relationships_df.rename(
+                columns={
+                    "feature_a": "Feature A",
+                    "feature_b": "Feature B",
+                    "reference_correlation": "Reference Correlation",
+                    "current_correlation": "Current Correlation",
+                    "change": "Correlation Change",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
 
     st.divider()
@@ -783,6 +898,56 @@ if "results_df" in st.session_state:
     st.info(
         interpretation
     )
+
+
+    # ---------------------------------------------------------
+    # WHAT CHANGED
+    # ---------------------------------------------------------
+
+    st.markdown("**What Changed?**")
+
+    st.write(
+        selected_result["what_changed"]
+    )
+
+    if selected_result["feature_type"] == "categorical":
+
+        added_categories, removed_categories, category_changes = (
+            categorical_change_details(
+                reference_df[selected_feature],
+                current_df[selected_feature],
+            )
+        )
+
+        category_col1, category_col2 = st.columns(2)
+
+        with category_col1:
+
+            st.markdown(
+                "**New Categories:** "
+                + (
+                    ", ".join(added_categories)
+                    if added_categories
+                    else "None"
+                )
+            )
+
+        with category_col2:
+
+            st.markdown(
+                "**Removed Categories:** "
+                + (
+                    ", ".join(removed_categories)
+                    if removed_categories
+                    else "None"
+                )
+            )
+
+        st.dataframe(
+            category_changes,
+            width="stretch",
+            hide_index=True,
+        )
 
 
     # ---------------------------------------------------------
