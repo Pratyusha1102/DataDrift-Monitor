@@ -235,22 +235,65 @@ def classify_drift_status(
     """Assign the final feature-level drift status."""
 
     if needs_review:
-
         return "Needs review"
 
 
     if adjusted_p_value < alpha:
-
         return "Significant drift"
 
 
     if raw_p_value < alpha:
-
         return "Potential drift"
-
 
     return "Stable"
 
+# Classify the severity of detected drift using transparent effect-size thresholds.
+def classify_drift_severity(status, feature_type, statistic, effect_size):
+    """
+    Classify detected drift as High, Medium, Low, Review, None, or Needs review.
+
+    Numerical features use the KS statistic as the effect-size measure.
+    Categorical features use Cramér's V as the effect-size measure.
+    Statistical significance is determined separately by classify_drift_status().
+    """
+
+    if status == "Needs review":
+        return "Needs review"
+
+    if status == "Stable":
+        return "None"
+
+    if status == "Potential drift":
+        return "Review"
+
+    if status != "Significant drift":
+        return "Review"
+
+    if feature_type == "numerical":
+        if statistic is None:
+            return "Review"
+
+        if statistic >= 0.50:
+            return "High"
+
+        if statistic >= 0.20:
+            return "Medium"
+
+        return "Low"
+
+    if feature_type == "categorical":
+        if effect_size is None:
+            return "Review"
+
+        if effect_size >= 0.50:
+            return "High"
+
+        if effect_size >= 0.30:
+            return "Medium"
+
+        return "Low"
+
+    return "Review"
 
 # Analyze all common features, apply Bonferroni correction,
 # and assign final drift statuses.
@@ -322,6 +365,14 @@ def detect_drift(
             result["needs_review"],
         )
 
+        # Classify the magnitude of the detected drift separately from statistical significance.
+        result["severity"] = classify_drift_severity(
+            status=result["status"],
+            feature_type=result["feature_type"],
+            statistic=result["statistic"],
+            effect_size=result["effect_size"],
+        )
+
 
     # Return results in a consistent column order.
     return pd.DataFrame(results)[
@@ -336,6 +387,7 @@ def detect_drift(
             "current_missing_pct",
             "needs_review",
             "status",
+            "severity",
         ]
     ]
 
