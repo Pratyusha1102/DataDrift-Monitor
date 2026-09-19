@@ -55,7 +55,6 @@ def run_drift_analysis(
 # Configure the Streamlit page.
 st.set_page_config(
     page_title="DataDrift Monitor",
-    page_icon="📊",
     layout="wide",
 )
 
